@@ -17,12 +17,14 @@
     "bcrypt": "^6.0.0",
     "dotenv": "^17.4.1",
     "express": "^5.2.1",
+    "express-handlebars": "^9.0.1",
     "express-session": "^1.19.0",
     "pg": "^8.20.0"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
     "@types/express": "^5.0.6",
+    "@types/express-handlebars": "^5.3.1",
     "@types/express-session": "^1.18.2",
     "@types/node": "^25.6.0",
     "@types/pg": "^8.20.0",

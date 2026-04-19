@@ -1,10 +1,21 @@
 import "dotenv/config";
 import express from "express";
 import session = require("express-session");
+import { engine } from "express-handlebars";
+import path from "path";
 import authRouter from "./routes/auth";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+app.engine("hbs", engine({
+    extname: ".hbs",
+    defaultLayout: "main",
+    layoutsDir: path.join(__dirname, "views/layouts"),
+    partialsDir: path.join(__dirname, "views/partials"),
+}));
+app.set("view engine", "hbs");
+app.set("views", path.join(__dirname, "views"));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -21,10 +32,10 @@ app.use(session({
 
 app.use("/", authRouter);
 
-app.get("/", (req, res) => {
-    res.send("Planche de marquage - OK");
-});
-
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
+});
+
+app.get("/", (req, res) => {
+    res.redirect("/login");
 });

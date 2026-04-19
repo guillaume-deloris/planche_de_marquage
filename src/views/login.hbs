@@ -1,0 +1,13 @@
+<div class="login-container">
+    <h1>Connexion</h1>
+    {{#if error}}
+        <p class="error">{{error}}</p>
+    {{/if}}
+    <form method="POST" action="/login">
+        <label for="username">Pseudo</label>
+        <input type="text" id="username" name="username" required>
+        <label for="password">Mot de passe</label>
+        <input type="password" id="password" name="password" required>
+        <button type="submit">Se connecter</button>
+    </form>
+</div>
