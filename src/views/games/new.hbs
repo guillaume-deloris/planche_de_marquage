@@ -1,0 +1,38 @@
+<div class="new-game-container">
+    <h1>Nouvelle partie</h1>
+    {{#if error}}
+        <p class="error">{{error}}</p>
+    {{/if}}
+    <form method="POST" action="/games/new">
+        <label for="name">Nom de la partie</label>
+        <input type="text" id="name" name="name" required>
+
+        <label for="gameTypeId">Type de jeu</label>
+        <select id="gameTypeId" name="gameTypeId">
+            <option value="">-- Choisir un jeu existant --</option>
+            {{#each gameTypes}}
+            <option value="{{this.id}}">{{this.name}}</option>
+            {{/each}}
+            <option value="new">+ Nouveau jeu</option>
+        </select>
+
+        <div id="newGameTypeBlock" style="display:none">
+            <label for="newGameTypeName">Nom du nouveau jeu</label>
+            <input type="text" id="newGameTypeName" name="newGameTypeName">
+            <label for="defaultRounds">Nombre de tours par défaut</label>
+            <input type="number" id="defaultRounds" name="defaultRounds" min="1" value="10">
+        </div>
+
+        <label for="roundCount">Nombre de tours</label>
+        <input type="number" id="roundCount" name="roundCount" min="1" value="10">
+
+        <button type="submit">Créer la partie</button>
+    </form>
+</div>
+
+<script>
+    document.getElementById("gameTypeId").addEventListener("change", function() {
+        const block = document.getElementById("newGameTypeBlock");
+        block.style.display = this.value === "new" ? "block" : "none";
+    });
+</script>

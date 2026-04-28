@@ -5,6 +5,7 @@ import { engine } from "express-handlebars";
 import path from "path";
 import authRouter from "./routes/auth";
 import dashboardRouter from "./routes/dashboard";
+import gamesRouter from "./routes/games";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -31,12 +32,6 @@ app.use(session({
     },
 }));
 
-app.use("/", authRouter);
-
-app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-});
-
 app.get("/", (req, res) => {
     const player = (req.session as any).player;
     if (player) {
@@ -46,4 +41,10 @@ app.get("/", (req, res) => {
     }
 });
 
+app.use("/", authRouter);
 app.use("/", dashboardRouter);
+app.use("/", gamesRouter);
+
+app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+});
