@@ -4,6 +4,7 @@ import session = require("express-session");
 import { engine } from "express-handlebars";
 import path from "path";
 import authRouter from "./routes/auth";
+import dashboardRouter from "./routes/dashboard";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -37,5 +38,12 @@ app.listen(PORT, () => {
 });
 
 app.get("/", (req, res) => {
-    res.redirect("/login");
+    const player = (req.session as any).player;
+    if (player) {
+        res.redirect("/dashboard");
+    } else {
+        res.render("home", { title: "Planche de marquage" });
+    }
 });
+
+app.use("/", dashboardRouter);

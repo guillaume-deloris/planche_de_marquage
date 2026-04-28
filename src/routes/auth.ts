@@ -38,12 +38,50 @@ router.post("/login", async (req: Request, res: Response) => {
 
 router.post("/logout", (req: Request, res: Response) => {
     req.session.destroy(() => {
-        res.redirect("/login");
+        res.redirect("/");
     });
 });
 
-router.get("/dashboard", requireAuth, (req: Request, res: Response) => {
-    res.render("dashboard", { title: "Dashboard", player: (req.session as any).player });
+router.get("/register", (req: Request, res: Response) => {
+    res.render("register", { title: "Créer un compte" });
+});
+
+router.post("/register", async (req: Request, res: Response) => {
+    const { username, password, passwordConfirm } = req.body;
+    if (password !== passwordConfirm) {
+        res.render("register", { title: "Créer un compte", error: "Les mots de passe ne correspondent pas" });
+        return;
+    }
+    const usernameRegex = /^[a-zA-Z0-9_-]{6,20}$/;
+    if (!usernameRegex.test(username)) {
+        res.render("register", { 
+            title: "Créer un compte", 
+            error: "Le pseudo doit contenir entre 6 et 20 caractères (lettres, chiffres, - et _ uniquement)" 
+        });
+        return;
+    }
+    try {
+        const { rows } = await pool.query("SELECT id FROM players WHERE username = $1", [username]);
+        if (rows.length > 0) {
+            res.render("register", { title: "Créer un compte", error: "Ce pseudo est déjà pris" });
+            return;
+        }
+        const hash = await bcrypt.hash(password, 10);
+        const result = await pool.query(
+            "INSERT INTO players (username, password, role) VALUES ($1, $2, 'player') RETURNING id, username, role",
+            [username, hash]
+        );
+        const player = result.rows[0];
+        (req.session as any).player = {
+            id: player.id,
+            username: player.username,
+            role: player.role,
+        };
+        res.redirect("/dashboard");
+    } catch (err) {
+        console.error(err);
+        res.status(500).send("Erreur serveur");
+    }
 });
 
 export default router;

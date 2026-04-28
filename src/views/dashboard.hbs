@@ -1,6 +1,39 @@
 <div class="dashboard-container">
     <h1>Bonjour {{player.username}}</h1>
-    <p>Bienvenue sur ta page joueur.</p>
+    
+    <div class="dashboard-stats">
+        <div class="stat-block">
+            <span class="stat-value">{{stats.game_count}}</span>
+            <span class="stat-label">Parties jouées</span>
+        </div>
+        <div class="stat-block">
+            <span class="stat-value">{{stats.win_count}}</span>
+            <span class="stat-label">Victoires</span>
+        </div>
+    </div>
+
+    <div class="dashboard-actions">
+        <a href="/games/new" class="btn">Nouvelle partie</a>
+    </div>
+
+    {{#if activeGames.length}}
+    <h2>Parties en cours</h2>
+    <ul class="games-list">
+        {{#each activeGames}}
+        <li><a href="/games/{{this.id}}">{{this.name}}</a></li>
+        {{/each}}
+    </ul>
+    {{/if}}
+
+    {{#if finishedGames.length}}
+    <h2>Parties terminées</h2>
+    <ul class="games-list">
+        {{#each finishedGames}}
+        <li><a href="/games/{{this.id}}">{{this.name}}</a></li>
+        {{/each}}
+    </ul>
+    {{/if}}
+
     <form method="POST" action="/logout">
         <button type="submit">Se déconnecter</button>
     </form>
