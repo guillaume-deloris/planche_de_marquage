@@ -20,7 +20,13 @@
     <h2>Parties en cours</h2>
     <ul class="games-list">
         {{#each activeGames}}
-        <li><a href="/games/{{this.id}}">{{this.name}}</a></li>
+        <li>    
+            {{#if (eq this.creator_id ../playerId)}}
+                <a href="/games/{{this.id}}/players">{{this.name}}</a>
+            {{else}}
+                <a href="/games/{{this.id}}/view">{{this.name}}</a>
+            {{/if}}
+        </li>
         {{/each}}
     </ul>
     {{/if}}

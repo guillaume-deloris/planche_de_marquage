@@ -9,24 +9,27 @@ export const getDashboard = async (req: Request, res: Response): Promise<void> =
             [player.id]
         );
         const { rows: activeGames } = await pool.query(
-            `SELECT g.id, g.name, g.status, g.created_at
+            `SELECT g.id, g.name, g.status, g.created_at, g.creator_id
             FROM games g
             JOIN game_scores gs ON gs.game_id = g.id
             WHERE gs.player_id = $1 AND g.status IN ('ready', 'in_progress')
+            GROUP BY g.id, g.name, g.status, g.created_at
             ORDER BY g.created_at DESC`,
             [player.id]
         );
         const { rows: finishedGames } = await pool.query(
-            `SELECT g.id, g.name, g.status, g.created_at
+            `SELECT g.id, g.name, g.status, g.created_at, g.creator_id
             FROM games g
             JOIN game_scores gs ON gs.game_id = g.id
             WHERE gs.player_id = $1 AND g.status = 'finished'
+            GROUP BY g.id, g.name, g.status, g.created_at
             ORDER BY g.created_at DESC`,
             [player.id]
         );
         res.render("dashboard", {
             title: "Dashboard",
             player,
+            playerId: player.id,
             stats: stats[0],
             activeGames,
             finishedGames,

@@ -29,7 +29,11 @@ router.post("/login", async (req: Request, res: Response) => {
             username: player.username,
             role: player.role,
         };
-        res.redirect("/dashboard");
+        const redirect = (req.session as any).redirectAfterLogin || "/dashboard";
+        delete (req.session as any).redirectAfterLogin;
+        req.session.save(() => {
+            res.redirect(redirect);
+        });
     } catch (err) {
         console.error(err);
         res.status(500).send("Erreur serveur");
@@ -77,7 +81,11 @@ router.post("/register", async (req: Request, res: Response) => {
             username: player.username,
             role: player.role,
         };
-        res.redirect("/dashboard");
+        const redirect = (req.session as any).redirectAfterLogin || "/dashboard";
+        delete (req.session as any).redirectAfterLogin;
+        req.session.save(() => {
+            res.redirect(redirect);
+        });
     } catch (err) {
         console.error(err);
         res.status(500).send("Erreur serveur");

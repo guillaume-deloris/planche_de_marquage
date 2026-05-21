@@ -1,0 +1,33 @@
+<div class="game-players-container">
+    <h1>{{game.name}}</h1>
+
+    <div class="qr-block">
+        <img src="{{qrCode}}" alt="QR Code de la partie">
+        <p>Lien de la partie : <a href="{{gameLink}}">{{gameLink}}</a></p>
+    </div>
+
+    <table class="scores-table">
+        <thead>
+            <tr>
+                <th>Joueur</th>
+                {{#each scoreMap.[0].rounds}}
+                <th>Tour {{this.round}}</th>
+                {{/each}}
+                <th>Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{#each scoreMap}}
+            <tr data-player-id="{{this.id}}">
+                <td>{{this.username}}</td>
+                {{#each this.rounds}}
+                <td class="score-cell" data-player-id="{{../id}}" data-round="{{this.round}}">
+                    {{#if this.score}}{{this.score}}{{else}}-{{/if}}
+                </td>
+                {{/each}}
+                <td class="total">0</td>
+            </tr>
+            {{/each}}
+        </tbody>
+    </table>
+</div>

@@ -1,0 +1,34 @@
+<div class="game-view-container">
+    <h1>{{game.name}}</h1>
+
+    <table class="scores-table">
+        <thead>
+            <tr>
+                <th>Joueur</th>
+                {{#each scoreMap.[0].rounds}}
+                <th>Tour {{this.round}}</th>
+                {{/each}}
+                <th>Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{#each scoreMap}}
+            <tr>
+                <td>{{this.username}}</td>
+                {{#each this.rounds}}
+                <td>{{#if this.score}}{{this.score}}{{else}}-{{/if}}</td>
+                {{/each}}
+                <td>0</td>
+            </tr>
+            {{/each}}
+        </tbody>
+    </table>
+
+    <button onclick="location.reload()">Actualiser</button>
+</div>
+
+<script>
+    setTimeout(function() {
+        location.reload();
+    }, 60000);
+</script>
