@@ -54,6 +54,9 @@ export const getGamePlayers = async (req: Request, res: Response): Promise<void>
                 const s = scores.find(s => s.player_id === p.id && s.round_number === i + 1);
                 return { round: i + 1, score: s?.score ?? null, status: s?.status ?? "pending" };
             }),
+            total: scores
+                .filter(s => s.player_id === p.id && s.score !== null)
+                .reduce((sum, s) => sum + Number(s.score), 0),
         }));
 
         res.render("games/players", {
@@ -181,5 +184,24 @@ export const getGameView = async (req: Request, res: Response): Promise<void> =>
     } catch (err) {
         console.error(err);
         res.status(500).send("Erreur serveur");
+    }
+};
+
+export const postScore = async (req: Request, res: Response): Promise<void> => {
+    const gameId = req.params.id;
+    const { playerId, round, score } = req.body;
+
+    console.log("postScore:", gameId, playerId, round, score);
+
+    try {
+        await pool.query(
+            `UPDATE game_scores SET score = $1, status = 'played'
+            WHERE game_id = $2 AND player_id = $3 AND round_number = $4`,
+            [score, gameId, playerId, round]
+        );
+        res.json({ success: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false });
     }
 };

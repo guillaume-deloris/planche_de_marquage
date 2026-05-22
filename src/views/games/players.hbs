@@ -25,9 +25,53 @@
                     {{#if this.score}}{{this.score}}{{else}}-{{/if}}
                 </td>
                 {{/each}}
-                <td class="total">0</td>
+                <td class="total">{{this.total}}</td>
             </tr>
             {{/each}}
         </tbody>
     </table>
+
+    <!-- modal de saisie des scores -->
+    <div id="score-modal" style="display:none">
+        <div class="modal-overlay"></div>
+        <div class="modal-content">
+            <h3>Saisir le score</h3>
+            <p id="modal-player-name"></p>
+            <p>Tour <span id="modal-round"></span></p>
+            <input type="number" id="modal-score-input">
+            <button id="modal-confirm">Valider</button>
+            <button id="modal-cancel">Annuler</button>
+        </div>
+    </div>
 </div>
+<script>
+    let currentPlayerId = null;
+    let currentRound = null;
+    let currentGameId = "{{game.id}}";
+
+    document.querySelectorAll(".score-cell").forEach(cell => {
+        cell.addEventListener("click", function() {
+            currentPlayerId = this.dataset.playerId;
+            currentRound = this.dataset.round;
+            document.getElementById("modal-round").textContent = currentRound;
+            document.getElementById("modal-player-name").textContent = this.closest("tr").querySelector("td").textContent;
+            document.getElementById("modal-score-input").value = "";
+            document.getElementById("score-modal").style.display = "block";
+        });
+    });
+
+    document.getElementById("modal-cancel").addEventListener("click", function() {
+        document.getElementById("score-modal").style.display = "none";
+    });
+
+    document.getElementById("modal-confirm").addEventListener("click", async function() {
+        const score = document.getElementById("modal-score-input").value;
+        await fetch(`/games/${currentGameId}/scores`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ playerId: currentPlayerId, round: currentRound, score }),
+        });
+        document.getElementById("score-modal").style.display = "none";
+        location.reload();
+    });
+</script>
