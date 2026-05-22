@@ -17,6 +17,7 @@ app.engine("hbs", engine({
     partialsDir: path.join(__dirname, "views/partials"),
     helpers: {
         eq: (a: any, b: any) => a === b,
+        add: (a: number, b: number) => a + b,
     },
 }));
 app.set("view engine", "hbs");

@@ -31,6 +31,10 @@
         </tbody>
     </table>
 
+    <form method="POST" action="/games/{{game.id}}/finish">
+        <button type="submit">Je déclare la fin de la partie</button>
+    </form>
+
     <!-- modal de saisie des scores -->
     <div id="score-modal" style="display:none">
         <div class="modal-overlay"></div>

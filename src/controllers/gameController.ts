@@ -103,8 +103,7 @@ export const postNewGame = async (req: Request, res: Response): Promise<void> =>
         }
         res.redirect(`/games/${gameId}/players`);
     } catch (err) {
-        
-          console.error("erreur postNewGame:", err);
+        console.error("erreur postNewGame:", err);
         res.status(500).send("Erreur serveur");
     }
 };
@@ -191,8 +190,6 @@ export const postScore = async (req: Request, res: Response): Promise<void> => {
     const gameId = req.params.id;
     const { playerId, round, score } = req.body;
 
-    console.log("postScore:", gameId, playerId, round, score);
-
     try {
         await pool.query(
             `UPDATE game_scores SET score = $1, status = 'played'
@@ -203,5 +200,70 @@ export const postScore = async (req: Request, res: Response): Promise<void> => {
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false });
+    }
+};
+
+export const postFinishGame = async (req: Request, res: Response): Promise<void> => {
+    const gameId = req.params.id;
+    const player = (req.session as any).player;
+    try {
+        const { rows: games } = await pool.query(
+            "SELECT * FROM games WHERE id = $1 AND creator_id = $2",
+            [gameId, player.id]
+        );
+        if (games.length === 0) {
+            res.status(403).send("Accès refusé");
+            return;
+        }
+        await pool.query(
+            "UPDATE games SET status = 'finished' WHERE id = $1",
+            [gameId]
+        );
+        res.redirect(`/games/${gameId}/results`);
+    } catch (err) {
+        console.error(err);
+        res.status(500).send("Erreur serveur");
+    }
+};
+
+export const getGameResults = async (req: Request, res: Response): Promise<void> => {
+    const gameId = req.params.id;
+    try {
+        const { rows: games } = await pool.query(
+            "SELECT * FROM games WHERE id = $1",
+            [gameId]
+        );
+        if (games.length === 0) {
+            res.status(404).send("Partie introuvable");
+            return;
+        }
+        const { rows: players } = await pool.query(
+            `SELECT p.id, p.username FROM players p
+            JOIN game_scores gs ON gs.game_id = $1 AND gs.player_id = p.id
+            GROUP BY p.id, p.username`,
+            [gameId]
+        );
+        const { rows: scores } = await pool.query(
+            `SELECT gs.player_id, gs.round_number, gs.score
+            FROM game_scores gs
+            WHERE gs.game_id = $1
+            ORDER BY gs.player_id, gs.round_number`,
+            [gameId]
+        );
+        const ranking = players.map(p => ({
+            ...p,
+            total: scores
+                .filter(s => s.player_id === p.id && s.score !== null)
+                .reduce((sum, s) => sum + Number(s.score), 0),
+        })).sort((a, b) => b.total - a.total);
+        res.render("games/results", {
+            title: "Résultats",
+            game: games[0],
+            ranking,
+            winner: ranking[0],
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send("Erreur serveur");
     }
 };
