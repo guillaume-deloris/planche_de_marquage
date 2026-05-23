@@ -6,6 +6,11 @@
         <p>Lien de la partie : <a href="{{gameLink}}">{{gameLink}}</a></p>
     </div>
 
+    {{#if nextPlayerName}}
+    <p class="next-turn-info">Tour <strong>{{currentRoundDisplay}}</strong></p>
+    <p class="next-turn-info">C'est à <strong>{{nextPlayerName}}</strong> de jouer</p>
+    {{/if}}
+
     <table class="scores-table">
         <thead>
             <tr>
@@ -16,12 +21,14 @@
                 <th>Total</th>
             </tr>
         </thead>
-        <tbody>
+        <tbody id="sortable-scores">
             {{#each scoreMap}}
             <tr data-player-id="{{this.id}}">
                 <td>{{this.username}}</td>
                 {{#each this.rounds}}
-                <td class="score-cell" data-player-id="{{../id}}" data-round="{{this.round}}">
+                <td class="score-cell{{#if (eq this.round @root.currentRoundDisplay)}}{{#if (eq ../id @root.nextPlayerId)}} next-cell{{/if}}{{/if}}"
+                    data-player-id="{{../id}}" 
+                    data-round="{{this.round}}">
                     {{#if this.score}}{{this.score}}{{else}}-{{/if}}
                 </td>
                 {{/each}}
@@ -49,6 +56,8 @@
     </div>
 </div>
 <script>
+
+    // score entry modal logic
     let currentPlayerId = null;
     let currentRound = null;
     let currentGameId = "{{game.id}}";
@@ -78,4 +87,38 @@
         document.getElementById("score-modal").style.display = "none";
         location.reload();
     });
+
+    // sortable logic
+    const sortable = new Sortable(document.getElementById("sortable-scores"), {
+        animation: 150,
+        handle: "td:first-child",
+        onEnd: async function() {
+            const rows = document.querySelectorAll("#sortable-scores tr");
+            const order = Array.from(rows).map((row, index) => ({
+                playerId: row.dataset.playerId,
+                order: index + 1,
+            }));
+            await fetch(`/games/{{game.id}}/order`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ order }),
+            });
+        },
+    });
+
+    // new players polling
+    setInterval(function() {
+        fetch(`/games/{{game.id}}/players/count`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.count !== {{players.length}}) {
+                    const audio = new Audio("https://www.soundjay.com/buttons/sounds/button-09.mp3");
+                    audio.play().then(() => {
+                        setTimeout(() => location.reload(), 1000);
+                    }).catch(() => {
+                        location.reload();
+                    });
+                }
+            });
+    }, 30000);
 </script>

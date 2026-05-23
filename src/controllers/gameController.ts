@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import pool from "../db";
 import QRCode from "qrcode";
 
+// displays game creation form with game types
 export const getNewGame = async (req: Request, res: Response): Promise<void> => {
     const player = (req.session as any).player;
     try {
@@ -19,6 +20,7 @@ export const getNewGame = async (req: Request, res: Response): Promise<void> => 
     }
 };
 
+// displays players in creator game view with links
 export const getGamePlayers = async (req: Request, res: Response): Promise<void> => {
     const player = (req.session as any).player;
     const gameId = req.params.id;
@@ -32,10 +34,10 @@ export const getGamePlayers = async (req: Request, res: Response): Promise<void>
             return;
         }
         const { rows: players } = await pool.query(
-            `SELECT p.id, p.username FROM players p
-            JOIN game_scores gs ON gs.player_id = p.id
-            WHERE gs.game_id = $1
-            GROUP BY p.id, p.username`,
+            `SELECT p.id, p.username, MIN(gs.play_order) as play_order FROM players p
+            JOIN game_scores gs ON gs.game_id = $1 AND gs.player_id = p.id
+            GROUP BY p.id, p.username
+            ORDER BY play_order ASC`,
             [gameId]
         );
 
@@ -59,6 +61,25 @@ export const getGamePlayers = async (req: Request, res: Response): Promise<void>
                 .reduce((sum, s) => sum + Number(s.score), 0),
         }));
 
+        // find the current round - the next pending round
+        const currentRound = scoreMap.reduce((minRound, p) => {
+            const firstPendingRound = p.rounds.find((r: any) => r.status === "pending");
+            if (firstPendingRound && firstPendingRound.round < minRound) {
+                return firstPendingRound.round;
+            }
+            return minRound;
+        }, Infinity);
+
+        // find the next player to play - the first player statue pending in the current round
+        const nextPlayer = currentRound === Infinity ? null : scoreMap.find(p => {
+            const round = p.rounds.find((r: any) => r.round === currentRound);
+            return round && round.status === "pending";
+        });
+
+        const nextPlayerId = nextPlayer ? nextPlayer.id : null;
+        const nextPlayerName = nextPlayer ? nextPlayer.username : null;
+        const currentRoundDisplay = currentRound === Infinity ? null : currentRound;
+
         res.render("games/players", {
             title: "Joueurs de la partie",
             game: games[0],
@@ -67,6 +88,9 @@ export const getGamePlayers = async (req: Request, res: Response): Promise<void>
             roundCount: games[0].round_count,
             qrCode,
             gameLink,
+            nextPlayerId,
+            nextPlayerName,
+            currentRoundDisplay
         });
     } catch (err) {
         console.error(err);
@@ -74,6 +98,7 @@ export const getGamePlayers = async (req: Request, res: Response): Promise<void>
     }
 };
 
+// create game and game_scores entries for creator
 export const postNewGame = async (req: Request, res: Response): Promise<void> => {
     const player = (req.session as any).player;
     const { name, gameTypeId, newGameTypeName, defaultRounds, roundCount } = req.body;
@@ -97,7 +122,7 @@ export const postNewGame = async (req: Request, res: Response): Promise<void> =>
         const roundCountNum = Number(roundCount);
         for (let i = 1; i <= roundCountNum; i++) {
             await pool.query(
-                "INSERT INTO game_scores (game_id, player_id, round_number, status) VALUES ($1, $2, $3, 'pending')",
+                "INSERT INTO game_scores (game_id, player_id, round_number, status, play_order) VALUES ($1, $2, $3, 'pending', 1)",
                 [gameId, player.id, i]
             );
         }
@@ -108,6 +133,7 @@ export const postNewGame = async (req: Request, res: Response): Promise<void> =>
     }
 };
 
+// join game via unique link, create game_scores entries if not exist, redirect to game view
 export const getGameByHash = async (req: Request, res: Response): Promise<void> => {
     const { hash } = req.params;
     try {
@@ -126,13 +152,19 @@ export const getGameByHash = async (req: Request, res: Response): Promise<void> 
             return;
         }
         const gameId = games[0].id;
+        const { rows: existingPlayers } = await pool.query(
+            "SELECT COUNT(DISTINCT player_id) as count FROM game_scores WHERE game_id = $1",
+            [gameId]
+        );
+        const playOrder = Number(existingPlayers[0].count) + 1;
+
         await pool.query(
-            `INSERT INTO game_scores (game_id, player_id, round_number, status)
-            SELECT $1, $2, generate_series(1, $3), 'pending'
+            `INSERT INTO game_scores (game_id, player_id, round_number, status, play_order)
+            SELECT $1, $2, generate_series(1, $3), 'pending', $4
             WHERE NOT EXISTS (
                 SELECT 1 FROM game_scores WHERE game_id = $1 AND player_id = $2
             )`,
-            [gameId, player.id, games[0].round_count]
+            [gameId, player.id, games[0].round_count, playOrder]
         );
         res.redirect(`/games/${gameId}/view`);
     } catch (err) {
@@ -141,6 +173,7 @@ export const getGameByHash = async (req: Request, res: Response): Promise<void> 
     }
 };
 
+// displays players in no-creator view
 export const getGameView = async (req: Request, res: Response): Promise<void> => {
     const player = (req.session as any).player;
     const gameId = req.params.id;
@@ -154,9 +187,10 @@ export const getGameView = async (req: Request, res: Response): Promise<void> =>
             return;
         }
         const { rows: players } = await pool.query(
-            `SELECT p.id, p.username FROM players p
+            `SELECT p.id, p.username, MIN(gs.play_order) as play_order FROM players p
             JOIN game_scores gs ON gs.game_id = $1 AND gs.player_id = p.id
-            GROUP BY p.id, p.username`,
+            GROUP BY p.id, p.username
+            ORDER BY play_order ASC`,
             [gameId]
         );
         const { rows: scores } = await pool.query(
@@ -173,12 +207,31 @@ export const getGameView = async (req: Request, res: Response): Promise<void> =>
                 return { round: i + 1, score: s?.score ?? null, status: s?.status ?? "pending" };
             }),
         }));
+        const currentRound = scoreMap.reduce((minRound: number, p: any) => {
+        const firstPendingRound = p.rounds.find((r: any) => r.status === "pending");
+        if (firstPendingRound && firstPendingRound.round < minRound) {
+            return firstPendingRound.round;
+        }
+        return minRound;
+    }, Infinity);
+        const nextPlayer = currentRound === Infinity ? null : scoreMap.find((p: any) => {
+            const playerRound = p.rounds.find((round: any) => round.round === currentRound);
+            return playerRound && playerRound.status === "pending";
+        });
+
+        const nextPlayerId = nextPlayer ? (nextPlayer as any).id : null;
+        const nextPlayerName = nextPlayer ? (nextPlayer as any).username : null;
+        const currentRoundDisplay = currentRound === Infinity ? null : currentRound;
+
         res.render("games/view", {
             title: games[0].name,
             game: games[0],
             scoreMap,
             roundCount: games[0].round_count,
             isCreator: player.id === games[0].creator_id,
+            nextPlayerId,
+            nextPlayerName,
+            currentRoundDisplay,
         });
     } catch (err) {
         console.error(err);
@@ -186,6 +239,7 @@ export const getGameView = async (req: Request, res: Response): Promise<void> =>
     }
 };
 
+// update score for player and round
 export const postScore = async (req: Request, res: Response): Promise<void> => {
     const gameId = req.params.id;
     const { playerId, round, score } = req.body;
@@ -203,6 +257,7 @@ export const postScore = async (req: Request, res: Response): Promise<void> => {
     }
 };
 
+// end game
 export const postFinishGame = async (req: Request, res: Response): Promise<void> => {
     const gameId = req.params.id;
     const player = (req.session as any).player;
@@ -226,6 +281,7 @@ export const postFinishGame = async (req: Request, res: Response): Promise<void>
     }
 };
 
+// displays game results with ranking
 export const getGameResults = async (req: Request, res: Response): Promise<void> => {
     const gameId = req.params.id;
     try {
@@ -265,5 +321,38 @@ export const getGameResults = async (req: Request, res: Response): Promise<void>
     } catch (err) {
         console.error(err);
         res.status(500).send("Erreur serveur");
+    }
+};
+
+// update play order of players in creator game view
+export const postGameOrder = async (req: Request, res: Response): Promise<void> => {
+    const gameId = req.params.id;
+    const { order } = req.body;
+    try {
+        for (const item of order) {
+            await pool.query(
+                "UPDATE game_scores SET play_order = $1 WHERE game_id = $2 AND player_id = $3",
+                [item.order, gameId, item.playerId]
+            );
+        }
+        res.json({ success: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false });
+    }
+};
+
+// polling update players
+export const getGamePlayersCount = async (req: Request, res: Response): Promise<void> => {
+    const gameId = req.params.id;
+    try {
+        const { rows } = await pool.query(
+            "SELECT COUNT(DISTINCT player_id) as count FROM game_scores WHERE game_id = $1",
+            [gameId]
+        );
+        res.json({ count: Number(rows[0].count) });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ count: 0 });
     }
 };

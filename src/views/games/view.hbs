@@ -1,6 +1,9 @@
 <div class="game-view-container">
     <h1>{{game.name}}</h1>
-
+    {{#if nextPlayerName}}
+    <p class="next-turn-info">Tour <strong>{{currentRoundDisplay}}</strong></p>
+    <p class="next-turn-info">C'est à <strong>{{nextPlayerName}}</strong> de jouer</p>
+    {{/if}}
     <table class="scores-table">
         <thead>
             <tr>
@@ -16,12 +19,14 @@
             <tr>
                 <td>{{this.username}}</td>
                 {{#each this.rounds}}
-                <td>{{#if this.score}}{{this.score}}{{else}}-{{/if}}</td>
+                <td class="{{#if (eq this.round @root.currentRoundDisplay)}}{{#if (eq ../id @root.nextPlayerId)}}next-cell{{/if}}{{/if}}">
+                    {{#if this.score}}{{this.score}}{{else}}-{{/if}}
+                </td>
                 {{/each}}
-                <td>0</td>
+                <td>{{this.total}}</td>
             </tr>
             {{/each}}
-        </tbody>
+</tbody>
     </table>
 
     <button onclick="location.reload()">Actualiser</button>

@@ -13,7 +13,9 @@
     </div>
 
     <div class="dashboard-actions">
-        <a href="/games/new" class="btn">Nouvelle partie</a>
+        <form method="GET" action="/games/new">
+            <button type="submit">Nouvelle partie</button>
+        </form>
     </div>
 
     {{#if activeGames.length}}
