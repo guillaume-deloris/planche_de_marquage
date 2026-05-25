@@ -18,6 +18,11 @@ app.engine("hbs", engine({
     helpers: {
         eq: (a: any, b: any) => a === b,
         add: (a: number, b: number) => a + b,
+        formatDate: (date: Date) => new Date(date).toLocaleDateString("fr-FR", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+        }),
     },
 }));
 app.set("view engine", "hbs");

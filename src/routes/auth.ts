@@ -27,7 +27,6 @@ router.post("/login", async (req: Request, res: Response) => {
         (req.session as any).player = {
             id: player.id,
             username: player.username,
-            role: player.role,
         };
         const redirect = (req.session as any).redirectAfterLogin || "/dashboard";
         delete (req.session as any).redirectAfterLogin;
@@ -72,14 +71,13 @@ router.post("/register", async (req: Request, res: Response) => {
         }
         const hash = await bcrypt.hash(password, 10);
         const result = await pool.query(
-            "INSERT INTO players (username, password, role) VALUES ($1, $2, 'player') RETURNING id, username, role",
+            "INSERT INTO players (username, password) VALUES ($1, $2) RETURNING id, username",
             [username, hash]
         );
         const player = result.rows[0];
         (req.session as any).player = {
             id: player.id,
             username: player.username,
-            role: player.role,
         };
         const redirect = (req.session as any).redirectAfterLogin || "/dashboard";
         delete (req.session as any).redirectAfterLogin;

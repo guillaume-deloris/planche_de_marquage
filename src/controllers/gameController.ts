@@ -300,23 +300,30 @@ export const getGameResults = async (req: Request, res: Response): Promise<void>
             [gameId]
         );
         const { rows: scores } = await pool.query(
-            `SELECT gs.player_id, gs.round_number, gs.score
+            `SELECT gs.player_id, gs.round_number, gs.score, gs.status
             FROM game_scores gs
             WHERE gs.game_id = $1
             ORDER BY gs.player_id, gs.round_number`,
             [gameId]
         );
+
         const ranking = players.map(p => ({
             ...p,
             total: scores
                 .filter(s => s.player_id === p.id && s.score !== null)
                 .reduce((sum, s) => sum + Number(s.score), 0),
+            rounds: Array.from({ length: games[0].round_count }, (_, i) => {
+                const s = scores.find(s => s.player_id === p.id && s.round_number === i + 1);
+                return { round: i + 1, score: s?.score ?? null };
+            }),
         })).sort((a, b) => b.total - a.total);
+
         res.render("games/results", {
             title: "Résultats",
             game: games[0],
             ranking,
             winner: ranking[0],
+            roundCount: games[0].round_count,
         });
     } catch (err) {
         console.error(err);

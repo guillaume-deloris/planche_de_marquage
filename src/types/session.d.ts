@@ -3,7 +3,6 @@ declare module "express-session" {
         player: {
             id: number;
             username: string;
-            role: string;
         };
     }
 }

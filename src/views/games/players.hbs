@@ -54,6 +54,9 @@
             <button id="modal-cancel">Annuler</button>
         </div>
     </div>
+
+    <button onclick="location.reload()">Actualiser</button>
+    <button onclick="location.href='/dashboard'">Retour au dashboard</button>
 </div>
 <script>
 
@@ -103,6 +106,7 @@
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ order }),
             });
+            location.reload();
         },
     });
 

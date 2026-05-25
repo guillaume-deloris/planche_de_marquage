@@ -7,3 +7,12 @@
 .next-player {
     background-color: #fff8e1;
 }
+
+.winner-row {
+    background-color: #fff8e1;
+    font-weight: bold;
+}
+
+.winner-row td:first-child {
+    font-size: 1.2em;
+}

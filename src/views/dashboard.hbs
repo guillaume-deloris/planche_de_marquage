@@ -22,12 +22,14 @@
     <h2>Parties en cours</h2>
     <ul class="games-list">
         {{#each activeGames}}
-        <li>    
+        <li>
             {{#if (eq this.creator_id ../playerId)}}
-                <a href="/games/{{this.id}}/players">{{this.name}}</a>
+            <a href="/games/{{this.id}}/players">{{this.name}}</a>
             {{else}}
-                <a href="/games/{{this.id}}/view">{{this.name}}</a>
+            <a href="/games/{{this.id}}/view">{{this.name}}</a>
             {{/if}}
+            — {{this.game_type_name}}
+            — {{formatDate this.created_at}}
         </li>
         {{/each}}
     </ul>
@@ -37,11 +39,15 @@
     <h2>Parties terminées</h2>
     <ul class="games-list">
         {{#each finishedGames}}
-        <li><a href="/games/{{this.id}}">{{this.name}}</a></li>
+        <li>
+            <a href="/games/{{this.id}}/results">{{this.name}}</a>
+            — {{this.game_type_name}}
+            — Vainqueur : <strong>{{this.winner_username}}</strong> ({{this.winner_total}} pts)
+            — {{formatDate this.created_at}}
+        </li>
         {{/each}}
     </ul>
     {{/if}}
-
     <form method="POST" action="/logout">
         <button type="submit">Se déconnecter</button>
     </form>

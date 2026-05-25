@@ -2,7 +2,6 @@ export interface Player {
     id: number;
     username: string;
     password: string;
-    role: string;
     creator_id: number | null;
     win_count: number;
     game_count: number;
@@ -12,5 +11,4 @@ export interface Player {
 export interface SessionPlayer {
     id: number;
     username: string;
-    role: string;
 }
