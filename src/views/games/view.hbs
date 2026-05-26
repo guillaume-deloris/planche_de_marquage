@@ -1,36 +1,59 @@
 <div class="game-view-container">
-    <h1>{{game.name}}</h1>
+
+    <!-- HEADER -->
+    <div class="game-header">
+        <h1>{{game.name}}</h1>
+        <button class="btn-icon" onclick="location.reload()" title="Actualiser la page">
+            <i class="ti ti-refresh"></i>
+        </button>
+    </div>
+
+    <!-- SECTION : tour en cours -->
     {{#if nextPlayerName}}
-    <p class="next-turn-info">Tour <strong>{{currentRoundDisplay}}</strong></p>
-    <p class="next-turn-info">C'est à <strong>{{nextPlayerName}}</strong> de jouer</p>
+    <section class="game-section live-info">
+        <div class="section-label">En cours</div>
+        <div class="live-info__content">
+            <div class="live-info__round">Tour {{currentRoundDisplay}}</div>
+            <div class="live-info__player">{{nextPlayerName}}</div>
+        </div>
+    </section>
     {{/if}}
-    <table class="scores-table">
-        <thead>
-            <tr>
-                <th>Joueur</th>
-                {{#each scoreMap.[0].rounds}}
-                <th>Tour {{this.round}}</th>
+
+    <!-- SECTION : tableau des scores -->
+    <section class="game-section">
+        <div class="section-label">Scores</div>
+        <table class="scores-table">
+            <thead>
+                <tr>
+                    <th>Joueur</th>
+                    {{#each scoreMap.[0].rounds}}
+                    <th>T{{this.round}}</th>
+                    {{/each}}
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{#each scoreMap}}
+                <tr>
+                    <td>{{this.username}}</td>
+                    {{#each this.rounds}}
+                    <td class="{{#if (eq this.round @root.currentRoundDisplay)}}{{#if (eq ../id @root.nextPlayerId)}}next-cell{{/if}}{{/if}}">
+                        {{#if this.score}}{{this.score}}{{else}}-{{/if}}
+                    </td>
+                    {{/each}}
+                    <td>{{this.total}}</td>
+                </tr>
                 {{/each}}
-                <th>Total</th>
-            </tr>
-        </thead>
-        <tbody>
-            {{#each scoreMap}}
-            <tr>
-                <td>{{this.username}}</td>
-                {{#each this.rounds}}
-                <td class="{{#if (eq this.round @root.currentRoundDisplay)}}{{#if (eq ../id @root.nextPlayerId)}}next-cell{{/if}}{{/if}}">
-                    {{#if this.score}}{{this.score}}{{else}}-{{/if}}
-                </td>
-                {{/each}}
-                <td>{{this.total}}</td>
-            </tr>
-            {{/each}}
-        </tbody>
-    </table>
-    <button onclick="location.reload()">Actualiser</button>
+            </tbody>
+        </table>
+    </section>
+
+    <!-- ACTIONS -->
+    <div class="game-actions">
+        <button onclick="location.href='/dashboard'">Dashboard</button>
+    </div>
+
 </div>
-<button onclick="location.href='/dashboard'">Retour au dashboard</button>
 
 <script>
     setTimeout(function() {

@@ -1,131 +1,91 @@
 <div class="game-players-container">
-    <h1>{{game.name}}</h1>
 
-    <div class="qr-block">
-        <img src="{{qrCode}}" alt="QR Code de la partie">
-        <p>Lien de la partie : <a href="{{gameLink}}">{{gameLink}}</a></p>
-        <a href="https://wa.me/?text=Rejoins%20ma%20partie%20{{game.name}}%20:%20{{gameLink}}" target="_blank">
-            <button>Envoyer une invitation via WhatsApp</button>
-        </a>
+    <!-- HEADER -->
+    <div class="game-header">
+        <h1>{{game.name}}</h1>
+        <button class="btn-icon" onclick="location.reload()" title="Actualiser la page">
+            <i class="ti ti-refresh"></i>
+        </button>
     </div>
 
+    <!-- SECTION 1 : invitation -->
+    <section class="game-section">
+        <div class="section-label">Inviter des joueurs</div>
+        <div class="qr-block">
+            <img src="{{qrCode}}" alt="QR Code de la partie">
+            <div class="qr-links">
+                <p class="game-link">{{gameLink}}</p>
+                <a href="https://wa.me/?text=Rejoins%20ma%20partie%20{{game.name}}%20:%20{{gameLink}}" target="_blank">
+                    <button>Envoyer via WhatsApp</button>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- SECTION 2 : tour en cours -->
     {{#if nextPlayerName}}
-    <p class="next-turn-info">Tour <strong>{{currentRoundDisplay}}</strong></p>
-    <p class="next-turn-info">C'est à <strong>{{nextPlayerName}}</strong> de jouer</p>
+    <section class="game-section live-info">
+        <div class="section-label">En cours</div>
+        <div class="live-info__content">
+            <div class="live-info__round">Tour {{currentRoundDisplay}}</div>
+            <div class="live-info__player">{{nextPlayerName}}</div>
+        </div>
+    </section>
     {{/if}}
 
-    <table class="scores-table">
-        <thead>
-            <tr>
-                <th>Joueur</th>
-                {{#each scoreMap.[0].rounds}}
-                <th>Tour {{this.round}}</th>
+    <!-- SECTION 3 : tableau des scores -->
+    <section class="game-section">
+        <div class="section-label">Scores</div>
+        <table class="scores-table">
+            <thead>
+                <tr>
+                    <th>Joueur</th>
+                    {{#each scoreMap.[0].rounds}}
+                    <th>T{{this.round}}</th>
+                    {{/each}}
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody id="sortable-scores">
+                {{#each scoreMap}}
+                <tr data-player-id="{{this.id}}">
+                    <td>{{this.username}}</td>
+                    {{#each this.rounds}}
+                    <td class="score-cell{{#if (eq this.round @root.currentRoundDisplay)}}{{#if (eq ../id @root.nextPlayerId)}} next-cell{{/if}}{{/if}}"
+                        data-player-id="{{../id}}"
+                        data-round="{{this.round}}">
+                        {{#if this.score}}{{this.score}}{{else}}-{{/if}}
+                    </td>
+                    {{/each}}
+                    <td class="total">{{this.total}}</td>
+                </tr>
                 {{/each}}
-                <th>Total</th>
-            </tr>
-        </thead>
-        <tbody id="sortable-scores">
-            {{#each scoreMap}}
-            <tr data-player-id="{{this.id}}">
-                <td>{{this.username}}</td>
-                {{#each this.rounds}}
-                <td class="score-cell{{#if (eq this.round @root.currentRoundDisplay)}}{{#if (eq ../id @root.nextPlayerId)}} next-cell{{/if}}{{/if}}"
-                    data-player-id="{{../id}}" 
-                    data-round="{{this.round}}">
-                    {{#if this.score}}{{this.score}}{{else}}-{{/if}}
-                </td>
-                {{/each}}
-                <td class="total">{{this.total}}</td>
-            </tr>
-            {{/each}}
-        </tbody>
-    </table>
+            </tbody>
+        </table>
+    </section>
 
-    <form method="POST" action="/games/{{game.id}}/finish">
-        <button type="submit">Je déclare la fin de la partie</button>
-    </form>
+    <!-- ACTIONS -->
+    <div class="game-actions">
+        <form method="POST" action="/games/{{game.id}}/finish">
+            <button type="submit" class="danger">Terminer la partie</button>
+        </form>
+        <button onclick="location.href='/dashboard'">Dashboard</button>
+    </div>
 
-    <!-- modal de saisie des scores -->
+    <!-- MODAL -->
     <div id="score-modal" style="display:none">
         <div class="modal-overlay"></div>
         <div class="modal-content">
-            <h3>Saisir le score</h3>
-            <p id="modal-player-name"></p>
-            <p>Tour <span id="modal-round"></span></p>
-            <input type="number" id="modal-score-input">
-            <button id="modal-confirm">Valider</button>
-            <button id="modal-cancel">Annuler</button>
+            <div class="modal-header">
+                <span id="modal-player-name"></span>
+                <span class="modal-round">Tour <span id="modal-round"></span></span>
+            </div>
+            <input type="number" id="modal-score-input" placeholder="Score">
+            <div class="modal-actions">
+                <button id="modal-confirm" class="primary">Valider</button>
+                <button id="modal-cancel">Annuler</button>
+            </div>
         </div>
     </div>
 
-    <button onclick="location.reload()">Actualiser</button>
-    <button onclick="location.href='/dashboard'">Retour au dashboard</button>
 </div>
-<script>
-
-    // score entry modal logic
-    let currentPlayerId = null;
-    let currentRound = null;
-    let currentGameId = "{{game.id}}";
-
-    document.querySelectorAll(".score-cell").forEach(cell => {
-        cell.addEventListener("click", function() {
-            currentPlayerId = this.dataset.playerId;
-            currentRound = this.dataset.round;
-            document.getElementById("modal-round").textContent = currentRound;
-            document.getElementById("modal-player-name").textContent = this.closest("tr").querySelector("td").textContent;
-            document.getElementById("modal-score-input").value = "";
-            document.getElementById("score-modal").style.display = "block";
-        });
-    });
-
-    document.getElementById("modal-cancel").addEventListener("click", function() {
-        document.getElementById("score-modal").style.display = "none";
-    });
-
-    document.getElementById("modal-confirm").addEventListener("click", async function() {
-        const score = document.getElementById("modal-score-input").value;
-        await fetch(`/games/${currentGameId}/scores`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ playerId: currentPlayerId, round: currentRound, score }),
-        });
-        document.getElementById("score-modal").style.display = "none";
-        location.reload();
-    });
-
-    // sortable logic
-    const sortable = new Sortable(document.getElementById("sortable-scores"), {
-        animation: 150,
-        handle: "td:first-child",
-        onEnd: async function() {
-            const rows = document.querySelectorAll("#sortable-scores tr");
-            const order = Array.from(rows).map((row, index) => ({
-                playerId: row.dataset.playerId,
-                order: index + 1,
-            }));
-            await fetch(`/games/{{game.id}}/order`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ order }),
-            });
-            location.reload();
-        },
-    });
-
-    // new players polling
-    setInterval(function() {
-        fetch(`/games/{{game.id}}/players/count`)
-            .then(res => res.json())
-            .then(data => {
-                if (data.count !== {{players.length}}) {
-                    const audio = new Audio("https://www.soundjay.com/buttons/sounds/button-09.mp3");
-                    audio.play().then(() => {
-                        setTimeout(() => location.reload(), 1000);
-                    }).catch(() => {
-                        location.reload();
-                    });
-                }
-            });
-    }, 30000);
-</script>
