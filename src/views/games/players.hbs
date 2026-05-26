@@ -4,6 +4,9 @@
     <div class="qr-block">
         <img src="{{qrCode}}" alt="QR Code de la partie">
         <p>Lien de la partie : <a href="{{gameLink}}">{{gameLink}}</a></p>
+        <a href="https://wa.me/?text=Rejoins%20ma%20partie%20{{game.name}}%20:%20{{gameLink}}" target="_blank">
+            <button>Envoyer une invitation via WhatsApp</button>
+        </a>
     </div>
 
     {{#if nextPlayerName}}

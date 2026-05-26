@@ -106,11 +106,19 @@ export const postNewGame = async (req: Request, res: Response): Promise<void> =>
         // create new game type if selected
         let finalGameTypeId = gameTypeId;
         if (gameTypeId === "new") {
-            const result = await pool.query(
-                "INSERT INTO game_types (name, default_rounds, creator_id) VALUES ($1, $2, $3) RETURNING id",
-                [newGameTypeName, defaultRounds, player.id]
+            const existing = await pool.query(
+                "SELECT id FROM game_types WHERE name = $1 AND creator_id = $2",
+                [newGameTypeName, player.id]
             );
-            finalGameTypeId = result.rows[0].id;
+            if (existing.rows.length > 0) {
+                finalGameTypeId = existing.rows[0].id;
+            } else {
+                const result = await pool.query(
+                    "INSERT INTO game_types (name, default_rounds, creator_id) VALUES ($1, $2, $3) RETURNING id",
+                    [newGameTypeName, defaultRounds, player.id]
+                );
+                finalGameTypeId = result.rows[0].id;
+            }
         }
 
         // create the game 
