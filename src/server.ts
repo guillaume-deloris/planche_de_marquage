@@ -1,6 +1,6 @@
 import "dotenv/config";
 import express from "express";
-import session = require("express-session");
+import expressSession from "express-session";
 import { engine } from "express-handlebars";
 import path from "path";
 import authRouter from "./routes/auth";
@@ -32,7 +32,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, "../public")));
 
-app.use(session({
+app.use((expressSession as any)({
     secret: process.env.SESSION_SECRET || "secret",
     resave: false,
     saveUninitialized: false,
