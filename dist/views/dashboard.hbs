@@ -1,0 +1,87 @@
+<div class="dashboard-container">
+
+    <!-- HEADER -->
+    <div class="game-header">
+        <h1>{{player.username}}</h1>
+        <div style="display:flex;gap:8px">
+            <button class="btn-icon" onclick="location.reload()" title="Actualiser la page">
+                <i class="ti ti-refresh"></i>
+            </button>
+            <form method="POST" action="/logout">
+                <button class="btn-icon" type="submit" title="Se déconnecter">
+                    <i class="ti ti-logout"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- SECTION : stats -->
+    <section class="game-section">
+        <div class="section-label">Statistiques</div>
+        <div class="dashboard-stats">
+            <div class="stat-block">
+                <span class="stat-value">{{stats.game_count}}</span>
+                <span class="stat-label">Parties jouées</span>
+            </div>
+            <div class="stat-block">
+                <span class="stat-value">{{stats.win_count}}</span>
+                <span class="stat-label">Victoires</span>
+            </div>
+        </div>
+    </section>
+
+        <!-- ACTION -->
+    <div class="game-actions">
+        <form method="GET" action="/games/new">
+            <button type="submit" class="primary">Nouvelle partie</button>
+        </form>
+    </div>
+
+    <!-- SECTION : parties en cours -->
+    {{#if activeGames.length}}
+    <section class="game-section">
+        <div class="section-label">Parties en cours</div>
+        <ul class="games-list">
+            {{#each activeGames}}
+            <li class="game-item">
+                <div class="game-item__main">
+                    {{#if (eq this.creator_id ../playerId)}}
+                    <a href="/games/{{this.id}}/players">{{this.name}}</a>
+                    {{else}}
+                    <a href="/games/{{this.id}}/view">{{this.name}}</a>
+                    {{/if}}
+                </div>
+                <div class="game-item__meta">
+                    <span>{{this.game_type_name}}</span>
+                    <span>{{formatDate this.created_at}}</span>
+                </div>
+            </li>
+            {{/each}}
+        </ul>
+    </section>
+    {{/if}}
+
+    <!-- SECTION : parties terminées -->
+    {{#if finishedGames.length}}
+    <section class="game-section">
+        <div class="section-label">Historique</div>
+        <ul class="games-list">
+            {{#each finishedGames}}
+            <li class="game-item">
+                <div class="game-item__main">
+                    <a href="/games/{{this.id}}/results">{{this.name}}</a>
+                </div>
+                <div class="game-item__meta">
+                    <span>{{this.game_type_name}}</span>
+                    <span>{{formatDate this.created_at}}</span>
+                </div>
+                <div class="game-item__winner">
+                    <i class="ti ti-trophy" aria-hidden="true"></i>
+                    {{this.winner_username}} — {{this.winner_total}} pts
+                </div>
+            </li>
+            {{/each}}
+        </ul>
+    </section>
+    {{/if}}
+</div>

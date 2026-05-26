@@ -1,0 +1,76 @@
+<div class="results-container">
+    <h1>{{game.name}} — Résultats</h1>
+
+    <div class="winner-block">
+        <p class="winner-trophy">🏆</p>
+        <h2>{{winner.username}}</h2>
+        <p class="winner-score">{{winner.total}} points</p>
+    </div>
+
+    <table class="ranking-table">
+        <thead>
+            <tr>
+                <th>Classement</th>
+                <th>Joueur</th>
+                {{#each ranking.[0].rounds}}
+                <th>Tour {{this.round}}</th>
+                {{/each}}
+                <th>Total</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {{#each ranking}}
+            <tr class="{{#if @first}}winner-row{{/if}}">
+                <td>{{add @index 1}}</td>
+                <td>{{this.username}}</td>
+                {{#each this.rounds}}
+                <td>{{#if this.score}}{{this.score}}{{else}}-{{/if}}</td>
+                {{/each}}
+                <td>{{this.total}}</td>
+                <td>{{#if @first}}🏆{{/if}}</td>
+            </tr>
+            {{/each}}
+        </tbody>
+    </table>
+
+    <button onclick="location.href='/dashboard'">Retour au dashboard</button>
+</div>
+
+<script>
+    {{#if @root.winner}}
+    const winner = document.querySelector(".winner-block");
+    winner.style.animation = "pulse 1s infinite";
+    {{/if}}
+</script>
+
+<style>
+    .winner-block {
+        text-align: center;
+        margin: 2rem auto;
+        padding: 1.5rem;
+        max-width: 300px;
+        border: 2px solid #f0a500;
+        border-radius: 12px;
+        background-color: #fff8e1;
+        animation: pulse 1s infinite;
+    }
+    .winner-trophy {
+        font-size: 3rem;
+        margin: 0;
+    }
+    .winner-block h2 {
+        font-size: 1.8rem;
+        margin: 0.5rem 0;
+    }
+    .winner-score {
+        font-size: 1.2rem;
+        color: #888;
+        margin: 0;
+    }
+    @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+        100% { transform: scale(1); }
+    }
+</style>

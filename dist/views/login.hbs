@@ -1,0 +1,18 @@
+<div class="login-container">
+    <h1>Connexion</h1>
+    {{#if error}}
+        <p class="error">{{error}}</p>
+    {{/if}}
+    <form method="POST" action="/login">
+        <label for="username">Pseudo</label>
+
+        <!-- Le pseudo est pré-rempli pour faciliter les tests -->
+        <input type="text" id="username" name="username" value="guillaume"required>
+        <label for="password">Mot de passe</label>
+
+        <!-- Le mot de passe est pré-rempli pour faciliter les tests -->
+        <input type="password" id="password" name="password" value="password" required>
+        <button type="submit">Se connecter</button>
+    </form>
+    <p>Pas encore de compte ? <a href="/register">Créer un compte</a></p>
+</div>
