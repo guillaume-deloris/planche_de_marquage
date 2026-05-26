@@ -103,6 +103,7 @@ export const postNewGame = async (req: Request, res: Response): Promise<void> =>
     const player = (req.session as any).player;
     const { name, gameTypeId, newGameTypeName, defaultRounds, roundCount } = req.body;
     try {
+        // create new game type if selected
         let finalGameTypeId = gameTypeId;
         if (gameTypeId === "new") {
             const result = await pool.query(
@@ -112,6 +113,7 @@ export const postNewGame = async (req: Request, res: Response): Promise<void> =>
             finalGameTypeId = result.rows[0].id;
         }
 
+        // create the game 
         const result = await pool.query(
             `INSERT INTO games (name, creator_id, game_type_id, round_count, status) 
             VALUES ($1, $2, $3, $4, 'in_progress') RETURNING id`,
@@ -119,6 +121,7 @@ export const postNewGame = async (req: Request, res: Response): Promise<void> =>
         );
 
         const gameId = result.rows[0].id;
+        // create game_scores entries
         const roundCountNum = Number(roundCount);
         for (let i = 1; i <= roundCountNum; i++) {
             await pool.query(
@@ -126,6 +129,11 @@ export const postNewGame = async (req: Request, res: Response): Promise<void> =>
                 [gameId, player.id, i]
             );
         }
+        // game_count for player increment
+        await pool.query(
+            "UPDATE players SET game_count = game_count + 1 WHERE id = $1",
+            [player.id]
+        );
         res.redirect(`/games/${gameId}/players`);
     } catch (err) {
         console.error("erreur postNewGame:", err);
@@ -158,6 +166,7 @@ export const getGameByHash = async (req: Request, res: Response): Promise<void> 
         );
         const playOrder = Number(existingPlayers[0].count) + 1;
 
+        // create game_scores entries for this player
         await pool.query(
             `INSERT INTO game_scores (game_id, player_id, round_number, status, play_order)
             SELECT $1, $2, generate_series(1, $3), 'pending', $4
@@ -165,6 +174,12 @@ export const getGameByHash = async (req: Request, res: Response): Promise<void> 
                 SELECT 1 FROM game_scores WHERE game_id = $1 AND player_id = $2
             )`,
             [gameId, player.id, games[0].round_count, playOrder]
+        );
+
+        // game_count for player increment
+        await pool.query(
+            "UPDATE players SET game_count = game_count + 1 WHERE id = $1",
+            [player.id]
         );
         res.redirect(`/games/${gameId}/view`);
     } catch (err) {
@@ -274,6 +289,23 @@ export const postFinishGame = async (req: Request, res: Response): Promise<void>
             "UPDATE games SET status = 'finished' WHERE id = $1",
             [gameId]
         );
+
+        // winner_count increment
+        const { rows: winner } = await pool.query(
+            `SELECT player_id, SUM(score) as total
+            FROM game_scores
+            WHERE game_id = $1
+            GROUP BY player_id
+            ORDER BY total DESC
+            LIMIT 1`,
+            [gameId]
+        );
+        if (winner.length > 0) {
+            await pool.query(
+                "UPDATE players SET win_count = win_count + 1 WHERE id = $1",
+                [winner[0].player_id]
+            );
+        }
         res.redirect(`/games/${gameId}/results`);
     } catch (err) {
         console.error(err);
