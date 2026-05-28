@@ -16,7 +16,7 @@ export const getNewGame = async (req: Request, res: Response): Promise<void> => 
         });
     } catch (err) {
         console.error(err);
-        res.status(500).send("Erreur serveur");
+        res.status(500).render("error", { title: "Erreur", message: "Impossible de charger le formulaire de création." });
     }
 };
 
@@ -30,7 +30,11 @@ export const getGamePlayers = async (req: Request, res: Response): Promise<void>
             [gameId, player.id]
         );
         if (games.length === 0) {
-            res.status(403).send("Accès refusé");
+            res.status(403).render("error", { title: "Accès refusé", message: "Tu n'es pas le créateur de cette partie ou elle n'existe pas." });
+            return;
+        }
+        if (games[0].status === "finished") {
+            res.redirect(`/games/${gameId}/results`);
             return;
         }
         const { rows: players } = await pool.query(
@@ -40,7 +44,6 @@ export const getGamePlayers = async (req: Request, res: Response): Promise<void>
             ORDER BY play_order ASC`,
             [gameId]
         );
-
         const gameLink = `${req.protocol}://${req.get("host")}/game/${games[0].unique_link}`;
         const qrCode = await QRCode.toDataURL(gameLink);
         const { rows: scores } = await pool.query(
@@ -60,8 +63,6 @@ export const getGamePlayers = async (req: Request, res: Response): Promise<void>
                 .filter(s => s.player_id === p.id && s.score !== null)
                 .reduce((sum, s) => sum + Number(s.score), 0),
         }));
-
-        // find the current round - the next pending round
         const currentRound = scoreMap.reduce((minRound, p) => {
             const firstPendingRound = p.rounds.find((r: any) => r.status === "pending");
             if (firstPendingRound && firstPendingRound.round < minRound) {
@@ -69,17 +70,13 @@ export const getGamePlayers = async (req: Request, res: Response): Promise<void>
             }
             return minRound;
         }, Infinity);
-
-        // find the next player to play - the first player statue pending in the current round
         const nextPlayer = currentRound === Infinity ? null : scoreMap.find(p => {
             const round = p.rounds.find((r: any) => r.round === currentRound);
             return round && round.status === "pending";
         });
-
         const nextPlayerId = nextPlayer ? nextPlayer.id : null;
         const nextPlayerName = nextPlayer ? nextPlayer.username : null;
         const currentRoundDisplay = currentRound === Infinity ? null : currentRound;
-
         res.render("games/players", {
             title: "Joueurs de la partie",
             game: games[0],
@@ -94,7 +91,7 @@ export const getGamePlayers = async (req: Request, res: Response): Promise<void>
         });
     } catch (err) {
         console.error(err);
-        res.status(500).send("Erreur serveur");
+        res.status(500).render("error", { title: "Erreur", message: "Impossible de charger la partie." });
     }
 };
 
@@ -103,7 +100,6 @@ export const postNewGame = async (req: Request, res: Response): Promise<void> =>
     const player = (req.session as any).player;
     const { name, gameTypeId, newGameTypeName, defaultRounds, roundCount } = req.body;
     try {
-        // create new game type if selected
         let finalGameTypeId = gameTypeId;
         if (gameTypeId === "new") {
             const existing = await pool.query(
@@ -120,16 +116,12 @@ export const postNewGame = async (req: Request, res: Response): Promise<void> =>
                 finalGameTypeId = result.rows[0].id;
             }
         }
-
-        // create the game 
         const result = await pool.query(
             `INSERT INTO games (name, creator_id, game_type_id, round_count, status) 
             VALUES ($1, $2, $3, $4, 'in_progress') RETURNING id`,
             [name, player.id, finalGameTypeId, roundCount]
         );
-
         const gameId = result.rows[0].id;
-        // create game_scores entries
         const roundCountNum = Number(roundCount);
         for (let i = 1; i <= roundCountNum; i++) {
             await pool.query(
@@ -137,19 +129,18 @@ export const postNewGame = async (req: Request, res: Response): Promise<void> =>
                 [gameId, player.id, i]
             );
         }
-        // game_count for player increment
         await pool.query(
             "UPDATE players SET game_count = game_count + 1 WHERE id = $1",
             [player.id]
         );
         res.redirect(`/games/${gameId}/players`);
     } catch (err) {
-        console.error("erreur postNewGame:", err);
-        res.status(500).send("Erreur serveur");
+        console.error(err);
+        res.status(500).render("error", { title: "Erreur", message: "Impossible de créer la partie. Réessaie dans quelques instants." });
     }
 };
 
-// join game via unique link, create game_scores entries if not exist, redirect to game view
+// join game via unique link
 export const getGameByHash = async (req: Request, res: Response): Promise<void> => {
     const { hash } = req.params;
     try {
@@ -158,7 +149,7 @@ export const getGameByHash = async (req: Request, res: Response): Promise<void> 
             [hash]
         );
         if (games.length === 0) {
-            res.status(404).send("Partie introuvable");
+            res.status(404).render("error", { title: "Partie introuvable", message: "Ce lien de partie est invalide ou a expiré." });
             return;
         }
         const player = (req.session as any).player;
@@ -167,14 +158,16 @@ export const getGameByHash = async (req: Request, res: Response): Promise<void> 
             res.redirect("/login");
             return;
         }
+        if (games[0].status === "finished") {
+            res.redirect(`/games/${games[0].id}/results`);
+            return;
+        }
         const gameId = games[0].id;
         const { rows: existingPlayers } = await pool.query(
             "SELECT COUNT(DISTINCT player_id) as count FROM game_scores WHERE game_id = $1",
             [gameId]
         );
         const playOrder = Number(existingPlayers[0].count) + 1;
-
-        // create game_scores entries for this player
         await pool.query(
             `INSERT INTO game_scores (game_id, player_id, round_number, status, play_order)
             SELECT $1, $2, generate_series(1, $3), 'pending', $4
@@ -183,8 +176,6 @@ export const getGameByHash = async (req: Request, res: Response): Promise<void> 
             )`,
             [gameId, player.id, games[0].round_count, playOrder]
         );
-
-        // game_count for player increment
         await pool.query(
             "UPDATE players SET game_count = game_count + 1 WHERE id = $1",
             [player.id]
@@ -192,7 +183,7 @@ export const getGameByHash = async (req: Request, res: Response): Promise<void> 
         res.redirect(`/games/${gameId}/view`);
     } catch (err) {
         console.error(err);
-        res.status(500).send("Erreur serveur");
+        res.status(500).render("error", { title: "Erreur", message: "Impossible de rejoindre la partie." });
     }
 };
 
@@ -206,7 +197,11 @@ export const getGameView = async (req: Request, res: Response): Promise<void> =>
             [gameId]
         );
         if (games.length === 0) {
-            res.status(404).send("Partie introuvable");
+            res.status(404).render("error", { title: "Partie introuvable", message: "Cette partie n'existe pas." });
+            return;
+        }
+        if (games[0].status === "finished") {
+            res.redirect(`/games/${gameId}/results`);
             return;
         }
         const { rows: players } = await pool.query(
@@ -234,21 +229,19 @@ export const getGameView = async (req: Request, res: Response): Promise<void> =>
                 .reduce((sum, s) => sum + Number(s.score), 0),
         }));
         const currentRound = scoreMap.reduce((minRound: number, p: any) => {
-        const firstPendingRound = p.rounds.find((r: any) => r.status === "pending");
-        if (firstPendingRound && firstPendingRound.round < minRound) {
-            return firstPendingRound.round;
-        }
-        return minRound;
-    }, Infinity);
+            const firstPendingRound = p.rounds.find((r: any) => r.status === "pending");
+            if (firstPendingRound && firstPendingRound.round < minRound) {
+                return firstPendingRound.round;
+            }
+            return minRound;
+        }, Infinity);
         const nextPlayer = currentRound === Infinity ? null : scoreMap.find((p: any) => {
             const playerRound = p.rounds.find((round: any) => round.round === currentRound);
             return playerRound && playerRound.status === "pending";
         });
-
         const nextPlayerId = nextPlayer ? (nextPlayer as any).id : null;
         const nextPlayerName = nextPlayer ? (nextPlayer as any).username : null;
         const currentRoundDisplay = currentRound === Infinity ? null : currentRound;
-
         res.render("games/view", {
             title: games[0].name,
             game: games[0],
@@ -261,7 +254,7 @@ export const getGameView = async (req: Request, res: Response): Promise<void> =>
         });
     } catch (err) {
         console.error(err);
-        res.status(500).send("Erreur serveur");
+        res.status(500).render("error", { title: "Erreur", message: "Impossible de charger la vue de la partie." });
     }
 };
 
@@ -269,8 +262,15 @@ export const getGameView = async (req: Request, res: Response): Promise<void> =>
 export const postScore = async (req: Request, res: Response): Promise<void> => {
     const gameId = req.params.id;
     const { playerId, round, score } = req.body;
-
     try {
+        const { rows: games } = await pool.query(
+            "SELECT status FROM games WHERE id = $1",
+            [gameId]
+        );
+        if (games.length === 0 || games[0].status === "finished") {
+            res.status(403).json({ success: false, message: "Cette partie est terminée." });
+            return;
+        }
         await pool.query(
             `UPDATE game_scores SET score = $1, status = 'played'
             WHERE game_id = $2 AND player_id = $3 AND round_number = $4`,
@@ -279,7 +279,7 @@ export const postScore = async (req: Request, res: Response): Promise<void> => {
         res.json({ success: true });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ success: false });
+        res.status(500).json({ success: false, message: "Impossible d'enregistrer le score." });
     }
 };
 
@@ -293,15 +293,13 @@ export const postFinishGame = async (req: Request, res: Response): Promise<void>
             [gameId, player.id]
         );
         if (games.length === 0) {
-            res.status(403).send("Accès refusé");
+            res.status(403).render("error", { title: "Accès refusé", message: "Tu n'es pas le créateur de cette partie." });
             return;
         }
         await pool.query(
             "UPDATE games SET status = 'finished' WHERE id = $1",
             [gameId]
         );
-
-        // winner_count increment
         const { rows: winner } = await pool.query(
             `SELECT player_id, SUM(score) as total
             FROM game_scores
@@ -320,7 +318,7 @@ export const postFinishGame = async (req: Request, res: Response): Promise<void>
         res.redirect(`/games/${gameId}/results`);
     } catch (err) {
         console.error(err);
-        res.status(500).send("Erreur serveur");
+        res.status(500).render("error", { title: "Erreur", message: "Impossible de terminer la partie." });
     }
 };
 
@@ -333,7 +331,7 @@ export const getGameResults = async (req: Request, res: Response): Promise<void>
             [gameId]
         );
         if (games.length === 0) {
-            res.status(404).send("Partie introuvable");
+            res.status(404).render("error", { title: "Partie introuvable", message: "Cette partie n'existe pas." });
             return;
         }
         const { rows: players } = await pool.query(
@@ -349,7 +347,6 @@ export const getGameResults = async (req: Request, res: Response): Promise<void>
             ORDER BY gs.player_id, gs.round_number`,
             [gameId]
         );
-
         const ranking = players.map(p => ({
             ...p,
             total: scores
@@ -360,7 +357,6 @@ export const getGameResults = async (req: Request, res: Response): Promise<void>
                 return { round: i + 1, score: s?.score ?? null };
             }),
         })).sort((a, b) => b.total - a.total);
-
         res.render("games/results", {
             title: "Résultats",
             game: games[0],
@@ -370,11 +366,11 @@ export const getGameResults = async (req: Request, res: Response): Promise<void>
         });
     } catch (err) {
         console.error(err);
-        res.status(500).send("Erreur serveur");
+        res.status(500).render("error", { title: "Erreur", message: "Impossible de charger les résultats." });
     }
 };
 
-// update play order of players in creator game view
+// update play order of players
 export const postGameOrder = async (req: Request, res: Response): Promise<void> => {
     const gameId = req.params.id;
     const { order } = req.body;
@@ -388,11 +384,11 @@ export const postGameOrder = async (req: Request, res: Response): Promise<void> 
         res.json({ success: true });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ success: false });
+        res.status(500).json({ success: false, message: "Impossible de mettre à jour l'ordre des joueurs." });
     }
 };
 
-// polling update players
+// polling update players count
 export const getGamePlayersCount = async (req: Request, res: Response): Promise<void> => {
     const gameId = req.params.id;
     try {

@@ -18,7 +18,7 @@ const getNewGame = async (req, res) => {
     }
     catch (err) {
         console.error(err);
-        res.status(500).send("Erreur serveur");
+        res.status(500).render("error", { title: "Erreur", message: "Impossible de charger le formulaire de création." });
     }
 };
 exports.getNewGame = getNewGame;
@@ -29,7 +29,11 @@ const getGamePlayers = async (req, res) => {
     try {
         const { rows: games } = await db_1.default.query("SELECT * FROM games WHERE id = $1 AND creator_id = $2", [gameId, player.id]);
         if (games.length === 0) {
-            res.status(403).send("Accès refusé");
+            res.status(403).render("error", { title: "Accès refusé", message: "Tu n'es pas le créateur de cette partie ou elle n'existe pas." });
+            return;
+        }
+        if (games[0].status === "finished") {
+            res.redirect(`/games/${gameId}/results`);
             return;
         }
         const { rows: players } = await db_1.default.query(`SELECT p.id, p.username, MIN(gs.play_order) as play_order FROM players p
@@ -52,7 +56,6 @@ const getGamePlayers = async (req, res) => {
                 .filter(s => s.player_id === p.id && s.score !== null)
                 .reduce((sum, s) => sum + Number(s.score), 0),
         }));
-        // find the current round - the next pending round
         const currentRound = scoreMap.reduce((minRound, p) => {
             const firstPendingRound = p.rounds.find((r) => r.status === "pending");
             if (firstPendingRound && firstPendingRound.round < minRound) {
@@ -60,7 +63,6 @@ const getGamePlayers = async (req, res) => {
             }
             return minRound;
         }, Infinity);
-        // find the next player to play - the first player statue pending in the current round
         const nextPlayer = currentRound === Infinity ? null : scoreMap.find(p => {
             const round = p.rounds.find((r) => r.round === currentRound);
             return round && round.status === "pending";
@@ -83,7 +85,7 @@ const getGamePlayers = async (req, res) => {
     }
     catch (err) {
         console.error(err);
-        res.status(500).send("Erreur serveur");
+        res.status(500).render("error", { title: "Erreur", message: "Impossible de charger la partie." });
     }
 };
 exports.getGamePlayers = getGamePlayers;
@@ -92,7 +94,6 @@ const postNewGame = async (req, res) => {
     const player = req.session.player;
     const { name, gameTypeId, newGameTypeName, defaultRounds, roundCount } = req.body;
     try {
-        // create new game type if selected
         let finalGameTypeId = gameTypeId;
         if (gameTypeId === "new") {
             const existing = await db_1.default.query("SELECT id FROM game_types WHERE name = $1 AND creator_id = $2", [newGameTypeName, player.id]);
@@ -104,32 +105,29 @@ const postNewGame = async (req, res) => {
                 finalGameTypeId = result.rows[0].id;
             }
         }
-        // create the game 
         const result = await db_1.default.query(`INSERT INTO games (name, creator_id, game_type_id, round_count, status) 
             VALUES ($1, $2, $3, $4, 'in_progress') RETURNING id`, [name, player.id, finalGameTypeId, roundCount]);
         const gameId = result.rows[0].id;
-        // create game_scores entries
         const roundCountNum = Number(roundCount);
         for (let i = 1; i <= roundCountNum; i++) {
             await db_1.default.query("INSERT INTO game_scores (game_id, player_id, round_number, status, play_order) VALUES ($1, $2, $3, 'pending', 1)", [gameId, player.id, i]);
         }
-        // game_count for player increment
         await db_1.default.query("UPDATE players SET game_count = game_count + 1 WHERE id = $1", [player.id]);
         res.redirect(`/games/${gameId}/players`);
     }
     catch (err) {
-        console.error("erreur postNewGame:", err);
-        res.status(500).send("Erreur serveur");
+        console.error(err);
+        res.status(500).render("error", { title: "Erreur", message: "Impossible de créer la partie. Réessaie dans quelques instants." });
     }
 };
 exports.postNewGame = postNewGame;
-// join game via unique link, create game_scores entries if not exist, redirect to game view
+// join game via unique link
 const getGameByHash = async (req, res) => {
     const { hash } = req.params;
     try {
         const { rows: games } = await db_1.default.query("SELECT * FROM games WHERE unique_link = $1", [hash]);
         if (games.length === 0) {
-            res.status(404).send("Partie introuvable");
+            res.status(404).render("error", { title: "Partie introuvable", message: "Ce lien de partie est invalide ou a expiré." });
             return;
         }
         const player = req.session.player;
@@ -138,22 +136,24 @@ const getGameByHash = async (req, res) => {
             res.redirect("/login");
             return;
         }
+        if (games[0].status === "finished") {
+            res.redirect(`/games/${games[0].id}/results`);
+            return;
+        }
         const gameId = games[0].id;
         const { rows: existingPlayers } = await db_1.default.query("SELECT COUNT(DISTINCT player_id) as count FROM game_scores WHERE game_id = $1", [gameId]);
         const playOrder = Number(existingPlayers[0].count) + 1;
-        // create game_scores entries for this player
         await db_1.default.query(`INSERT INTO game_scores (game_id, player_id, round_number, status, play_order)
             SELECT $1, $2, generate_series(1, $3), 'pending', $4
             WHERE NOT EXISTS (
                 SELECT 1 FROM game_scores WHERE game_id = $1 AND player_id = $2
             )`, [gameId, player.id, games[0].round_count, playOrder]);
-        // game_count for player increment
         await db_1.default.query("UPDATE players SET game_count = game_count + 1 WHERE id = $1", [player.id]);
         res.redirect(`/games/${gameId}/view`);
     }
     catch (err) {
         console.error(err);
-        res.status(500).send("Erreur serveur");
+        res.status(500).render("error", { title: "Erreur", message: "Impossible de rejoindre la partie." });
     }
 };
 exports.getGameByHash = getGameByHash;
@@ -164,7 +164,11 @@ const getGameView = async (req, res) => {
     try {
         const { rows: games } = await db_1.default.query("SELECT * FROM games WHERE id = $1", [gameId]);
         if (games.length === 0) {
-            res.status(404).send("Partie introuvable");
+            res.status(404).render("error", { title: "Partie introuvable", message: "Cette partie n'existe pas." });
+            return;
+        }
+        if (games[0].status === "finished") {
+            res.redirect(`/games/${gameId}/results`);
             return;
         }
         const { rows: players } = await db_1.default.query(`SELECT p.id, p.username, MIN(gs.play_order) as play_order FROM players p
@@ -212,7 +216,7 @@ const getGameView = async (req, res) => {
     }
     catch (err) {
         console.error(err);
-        res.status(500).send("Erreur serveur");
+        res.status(500).render("error", { title: "Erreur", message: "Impossible de charger la vue de la partie." });
     }
 };
 exports.getGameView = getGameView;
@@ -221,13 +225,18 @@ const postScore = async (req, res) => {
     const gameId = req.params.id;
     const { playerId, round, score } = req.body;
     try {
+        const { rows: games } = await db_1.default.query("SELECT status FROM games WHERE id = $1", [gameId]);
+        if (games.length === 0 || games[0].status === "finished") {
+            res.status(403).json({ success: false, message: "Cette partie est terminée." });
+            return;
+        }
         await db_1.default.query(`UPDATE game_scores SET score = $1, status = 'played'
             WHERE game_id = $2 AND player_id = $3 AND round_number = $4`, [score, gameId, playerId, round]);
         res.json({ success: true });
     }
     catch (err) {
         console.error(err);
-        res.status(500).json({ success: false });
+        res.status(500).json({ success: false, message: "Impossible d'enregistrer le score." });
     }
 };
 exports.postScore = postScore;
@@ -238,11 +247,10 @@ const postFinishGame = async (req, res) => {
     try {
         const { rows: games } = await db_1.default.query("SELECT * FROM games WHERE id = $1 AND creator_id = $2", [gameId, player.id]);
         if (games.length === 0) {
-            res.status(403).send("Accès refusé");
+            res.status(403).render("error", { title: "Accès refusé", message: "Tu n'es pas le créateur de cette partie." });
             return;
         }
         await db_1.default.query("UPDATE games SET status = 'finished' WHERE id = $1", [gameId]);
-        // winner_count increment
         const { rows: winner } = await db_1.default.query(`SELECT player_id, SUM(score) as total
             FROM game_scores
             WHERE game_id = $1
@@ -256,7 +264,7 @@ const postFinishGame = async (req, res) => {
     }
     catch (err) {
         console.error(err);
-        res.status(500).send("Erreur serveur");
+        res.status(500).render("error", { title: "Erreur", message: "Impossible de terminer la partie." });
     }
 };
 exports.postFinishGame = postFinishGame;
@@ -266,7 +274,7 @@ const getGameResults = async (req, res) => {
     try {
         const { rows: games } = await db_1.default.query("SELECT * FROM games WHERE id = $1", [gameId]);
         if (games.length === 0) {
-            res.status(404).send("Partie introuvable");
+            res.status(404).render("error", { title: "Partie introuvable", message: "Cette partie n'existe pas." });
             return;
         }
         const { rows: players } = await db_1.default.query(`SELECT p.id, p.username FROM players p
@@ -296,11 +304,11 @@ const getGameResults = async (req, res) => {
     }
     catch (err) {
         console.error(err);
-        res.status(500).send("Erreur serveur");
+        res.status(500).render("error", { title: "Erreur", message: "Impossible de charger les résultats." });
     }
 };
 exports.getGameResults = getGameResults;
-// update play order of players in creator game view
+// update play order of players
 const postGameOrder = async (req, res) => {
     const gameId = req.params.id;
     const { order } = req.body;
@@ -312,11 +320,11 @@ const postGameOrder = async (req, res) => {
     }
     catch (err) {
         console.error(err);
-        res.status(500).json({ success: false });
+        res.status(500).json({ success: false, message: "Impossible de mettre à jour l'ordre des joueurs." });
     }
 };
 exports.postGameOrder = postGameOrder;
-// polling update players
+// polling update players count
 const getGamePlayersCount = async (req, res) => {
     const gameId = req.params.id;
     try {
