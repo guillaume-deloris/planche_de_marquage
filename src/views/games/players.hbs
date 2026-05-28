@@ -89,3 +89,74 @@
     </div>
 
 </div>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+
+    // score entry modal logic
+    let currentPlayerId = null;
+    let currentRound = null;
+    let currentGameId = "{{game.id}}";
+
+    document.querySelectorAll(".score-cell").forEach(cell => {
+        cell.addEventListener("click", function() {
+            currentPlayerId = this.dataset.playerId;
+            currentRound = this.dataset.round;
+            document.getElementById("modal-round").textContent = currentRound;
+            document.getElementById("modal-player-name").textContent = this.closest("tr").querySelector("td").textContent;
+            document.getElementById("modal-score-input").value = "";
+            document.getElementById("score-modal").style.display = "block";
+        });
+    });
+
+    document.getElementById("modal-cancel").addEventListener("click", function() {
+        document.getElementById("score-modal").style.display = "none";
+    });
+
+    document.getElementById("modal-confirm").addEventListener("click", async function() {
+        const score = document.getElementById("modal-score-input").value;
+        await fetch(`/games/${currentGameId}/scores`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ playerId: currentPlayerId, round: currentRound, score }),
+        });
+        document.getElementById("score-modal").style.display = "none";
+        location.reload();
+    });
+
+    // sortable logic
+    const sortable = new Sortable(document.getElementById("sortable-scores"), {
+        animation: 150,
+        handle: "td:first-child",
+        onEnd: async function() {
+            const rows = document.querySelectorAll("#sortable-scores tr");
+            const order = Array.from(rows).map((row, index) => ({
+                playerId: row.dataset.playerId,
+                order: index + 1,
+            }));
+            await fetch(`/games/{{game.id}}/order`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ order }),
+            });
+            location.reload();
+        },
+    });
+
+    // new players polling
+    setInterval(function() {
+        fetch(`/games/{{game.id}}/players/count`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.count !== {{players.length}}) {
+                    const audio = new Audio("https://www.soundjay.com/buttons/sounds/button-09.mp3");
+                    audio.play().then(() => {
+                        setTimeout(() => location.reload(), 1000);
+                    }).catch(() => {
+                        location.reload();
+                    });
+                }
+            });
+    }, 30000);
+
+});
+</script>

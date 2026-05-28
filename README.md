@@ -25,11 +25,11 @@ Chacun dispose de ses statistiques historisées dans son taleau de bord.
 - Inscription et connexion avec mot de passe hashé
 - Création de parties avec type de jeu personnalisable
 - Génération d'un lien unique et QR code par partie
+- Redirection automatique vers la partie après login via QR code
 - Tableau des scores tour par tour
 - Vue créateur (saisie des scores) et vue joueur (lecture seule)
 - Actualisation automatique par polling toutes les minutes
 - Historique des parties dans l'espace joueur
-- Redirection automatique vers la partie après login via QR code
 
 ## Cinématique
 
@@ -73,46 +73,43 @@ SESSION_SECRET=une_chaine_aleatoire_longue
 ### Base de données
 
 ```sql
-CREATE DATABASE planche_dev;
-\c planche_dev
-
-CREATE TABLE players (
-    id SERIAL PRIMARY KEY,
-    username VARCHAR(100) NOT NULL UNIQUE,
-    password VARCHAR(255) NOT NULL,
-    role VARCHAR(20) NOT NULL DEFAULT 'player',
-    creator_id INTEGER REFERENCES players(id),
-    win_count INTEGER DEFAULT 0,
-    game_count INTEGER DEFAULT 0,
-    created_at TIMESTAMP DEFAULT NOW()
+CREATE TABLE public.game_scores (
+    id integer NOT NULL,
+    game_id integer NOT NULL,
+    player_id integer NOT NULL,
+    round_number integer NOT NULL,
+    score integer,
+    status character varying(20) DEFAULT 'pending'::character varying NOT NULL,
+    play_order integer
 );
 
-CREATE TABLE game_types (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    default_rounds INTEGER NOT NULL,
-    creator_id INTEGER REFERENCES players(id)
+CREATE TABLE public.game_types (
+    id integer NOT NULL,
+    name character varying(100) NOT NULL,
+    default_rounds integer NOT NULL,
+    creator_id integer
 );
 
-CREATE TABLE games (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    creator_id INTEGER NOT NULL REFERENCES players(id),
-    game_type_id INTEGER NOT NULL REFERENCES game_types(id),
-    round_count INTEGER NOT NULL,
-    status VARCHAR(30) NOT NULL DEFAULT 'draft',
-    started_at TIMESTAMP,
-    unique_link UUID DEFAULT gen_random_uuid(),
-    created_at TIMESTAMP DEFAULT NOW()
+CREATE TABLE public.games (
+    id integer NOT NULL,
+    name character varying(100) NOT NULL,
+    creator_id integer NOT NULL,
+    game_type_id integer NOT NULL,
+    round_count integer NOT NULL,
+    status character varying(30) DEFAULT 'draft'::character varying NOT NULL,
+    started_at timestamp without time zone,
+    unique_link uuid DEFAULT gen_random_uuid(),
+    created_at timestamp without time zone DEFAULT now()
 );
 
-CREATE TABLE game_scores (
-    id SERIAL PRIMARY KEY,
-    game_id INTEGER NOT NULL REFERENCES games(id),
-    player_id INTEGER NOT NULL REFERENCES players(id),
-    round_number INTEGER NOT NULL,
-    score INTEGER,
-    status VARCHAR(20) NOT NULL DEFAULT 'pending'
+CREATE TABLE public.players (
+    id integer NOT NULL,
+    username character varying(100) NOT NULL,
+    password character varying(255) NOT NULL,
+    creator_id integer,
+    win_count integer DEFAULT 0,
+    game_count integer DEFAULT 0,
+    created_at timestamp without time zone DEFAULT now()
 );
 ```
 
