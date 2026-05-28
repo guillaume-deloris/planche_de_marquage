@@ -181,6 +181,9 @@ const getGameView = async (req, res) => {
                 const s = scores.find(s => s.player_id === p.id && s.round_number === i + 1);
                 return { round: i + 1, score: s?.score ?? null, status: s?.status ?? "pending" };
             }),
+            total: scores
+                .filter(s => s.player_id === p.id && s.score !== null)
+                .reduce((sum, s) => sum + Number(s.score), 0),
         }));
         const currentRound = scoreMap.reduce((minRound, p) => {
             const firstPendingRound = p.rounds.find((r) => r.status === "pending");
